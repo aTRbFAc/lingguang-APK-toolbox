@@ -15,7 +15,7 @@
 ![主界面](Screen/homepage.jpg)
 
 ### 进度界面
-![进度界面](Screen/scheduld.jpg)
+![进度界面](Screen/schedule.jpg)
 
 ### 打包界面
 ![打包界面](Screen/pack.jpg)
