@@ -12,6 +12,7 @@ import xml.etree.ElementTree as ET
 ANDROID_NS = "http://schemas.android.com/apk/res/android"
 
 def get_resource_path(relative_path):
+    """获取资源的绝对路径"""
     if hasattr(sys, '_MEIPASS'):
         return os.path.join(sys._MEIPASS, relative_path)
     else:
@@ -214,8 +215,10 @@ class APKGenerator:
 
         # 设置窗口图标
         try:
-            self.root.iconbitmap("icon/icon.ico")
-        except:
+            icon_path = get_resource_path(os.path.join("icon", "icon.ico"))
+            apk_dialog.iconbitmap(icon_path)
+        except Exception as e:
+            print(f"APK设置窗口图标加载失败: {e}")
             pass
 
         # 居中显示
@@ -370,8 +373,6 @@ class APKGenerator:
             value="landscape"
         ).pack(side=tk.LEFT, padx=5)
 
-
-        
         # 全屏选项
         row += 1
         fullscreen_var = tk.BooleanVar()

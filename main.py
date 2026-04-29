@@ -1,3 +1,4 @@
+# main.py
 import tkinter as tk
 from tkinter import ttk, messagebox, Toplevel, filedialog
 import re
@@ -11,6 +12,7 @@ from py.config import load_config, save_config
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from tkinter.scrolledtext import ScrolledText
+from py.resource_utils import get_resource_path
 
 class LicenseDialog:
     """免责声明弹窗"""
@@ -28,8 +30,10 @@ class LicenseDialog:
 
         # 设置窗口图标
         try:
-            self.root.iconbitmap("icon/icon.ico")
-        except:
+            icon_path = get_resource_path(os.path.join("icon", "icon.ico"))
+            dialog.iconbitmap(icon_path)
+        except Exception as e:
+            print(f"免责声明窗口图标加载失败: {e}")
             pass
 
         # 使弹窗始终在最前面
@@ -114,7 +118,7 @@ class LicenseDialog:
 一、软件性质
 1. 本软件为开源工具，采用MIT许可证，仅供学习和研究使用。
 2. 本软件不得用于商业用途或任何违法活动。
-3. 仓库链接：
+3. 仓库链接：https://github.com/aTRbFAc/lingguang-APK-toolbox
 
 二、用户责任
 1. 用户应确保其行为符合相关法律法规。
@@ -207,7 +211,8 @@ class LicenseDialog:
         
         try:
             # 尝试加载本地二维码图片
-            qr_image = Image.open("images/qrcode.png")
+            qr_path = get_resource_path(os.path.join("images", "qrcode.png"))
+            qr_image = Image.open(qr_path)
             qr_image = qr_image.resize((280, 280), Image.Resampling.LANCZOS)
             qr_photo = ImageTk.PhotoImage(qr_image)
             
@@ -218,8 +223,9 @@ class LicenseDialog:
             )
             qr_label.image = qr_photo
             qr_label.pack(expand=True)
-        except:
+        except Exception as e:
             # 如果图片不存在，显示占位符
+            print(f"二维码加载失败: {e}")
             tk.Label(
                 qr_frame,
                 text="二维码加载失败……",
@@ -323,6 +329,14 @@ class ProgressDialog:
         self.dialog.geometry("500x300")
         self.dialog.resizable(False, False)
         self.dialog.configure(bg='white')
+
+        # 设置窗口图标
+        try:
+            icon_path = get_resource_path(os.path.join("icon", "icon.ico"))
+            self.dialog.iconbitmap(icon_path)
+        except Exception as e:
+            print(f"进度条窗口图标加载失败: {e}")
+            pass
         
         # 使弹窗始终在最前面
         self.dialog.transient(self.parent)
@@ -417,8 +431,10 @@ class APKToolboxGUI:
         
         # 设置窗口图标
         try:
-            self.root.iconbitmap("icon/icon.ico")
-        except:
+            icon_path = get_resource_path(os.path.join("icon", "icon.ico"))
+            self.root.iconbitmap(icon_path)
+        except Exception as e:
+            print(f"主窗口图标加载失败: {e}")
             pass
         
         # 颜色方案 - 将按钮颜色改为蓝色
@@ -1076,6 +1092,14 @@ class APKToolboxGUI:
         error_dialog.configure(bg='white')
         error_dialog.transient(self.root)
         error_dialog.grab_set()
+
+        # 设置窗口图标
+        try:
+            icon_path = get_resource_path(os.path.join("icon", "icon.ico"))
+            error_dialog.iconbitmap(icon_path)
+        except Exception as e:
+            print(f"错误对话框图标加载失败: {e}")
+            pass
         
         # 居中显示
         window_width = 400
@@ -1139,8 +1163,10 @@ class APKToolboxGUI:
 
         # 设置窗口图标
         try:
-            self.root.iconbitmap("icon/icon.ico")
-        except:
+            icon_path = get_resource_path(os.path.join("icon", "icon.ico"))
+            result_dialog.iconbitmap(icon_path)
+        except Exception as e:
+            print(f"结果对话框图标加载失败: {e}")
             pass
 
         # 居中显示
@@ -1308,8 +1334,10 @@ class APKToolboxGUI:
 
         # 设置窗口图标
         try:
-            self.root.iconbitmap("icon/icon.ico")
-        except:
+            icon_path = get_resource_path(os.path.join("icon", "icon.ico"))
+            about_dialog.iconbitmap(icon_path)
+        except Exception as e:
+            print(f"关于窗口图标加载失败: {e}")
             pass
 
         # 居中显示
@@ -1334,13 +1362,15 @@ class APKToolboxGUI:
         
         # Logo
         try:
-            image = Image.open("images/icon.png")
+            logo_path = get_resource_path(os.path.join("images", "icon.png"))
+            image = Image.open(logo_path)
             image = image.resize((80, 80), Image.Resampling.LANCZOS)
             photo = ImageTk.PhotoImage(image)
             logo_label = tk.Label(logo_frame, image=photo, bg='white')
             logo_label.image = photo
             logo_label.pack()
-        except:
+        except Exception as e:
+            print(f"Logo图片加载失败: {e}")
             tk.Label(
                 logo_frame,
                 text="灵光APK工具箱",
@@ -1385,7 +1415,7 @@ class APKToolboxGUI:
             padx=10,
             pady=5
         ).pack(anchor='w')
-        
+
         tk.Label(
             desc_card,
             text="一款自动提取灵光闪应用网页内容并转换为APK应用的工具，简化您的开发流程。",
@@ -1467,8 +1497,9 @@ class APKToolboxGUI:
 
         # 设置窗口图标
         try:
-            self.root.iconbitmap("icon/icon.ico")
-        except:
+            icon_path = get_resource_path(os.path.join("icon", "icon.ico"))
+            settings_dialog.iconbitmap(icon_path)
+        except Exception as e:
             pass
 
         # 居中显示
