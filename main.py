@@ -161,7 +161,7 @@ class LicenseDialog:
 
 我已阅读、理解并同意上述所有条款。"""
         
-        license_text.insert('1.0', disclaimer_content)
+        license_text.insert('1.0.5', disclaimer_content)
         license_text.config(state='disabled')
         
         # 同意选项
@@ -802,7 +802,7 @@ class APKToolboxGUI:
         # 版权信息
         tk.Label(
             status_bar,
-            text="© 2026 文幻工作室 | 灵光APK工具箱 v1.0",
+            text="© 2026 文幻工作室 | 灵光APK工具箱 v1.0.5",
             font=self.fonts['small'],
             bg=self.colors['dark'],
             fg='white',

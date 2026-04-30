@@ -29,7 +29,7 @@ class APKGenerator:
         }
 
         self.jre_java = get_resource_path(
-            os.path.join("resources", "jre", "OpenJDKJRE64", "bin", "java.exe")
+            os.path.join("resources", "jre", "bin", "java.exe")
         )
         self.apktool_jar = get_resource_path(
             os.path.join("resources", "apktool.jar")
@@ -56,6 +56,34 @@ class APKGenerator:
             app = root.find("application")
             if app is not None:
                 app.set(f"{{{ANDROID_NS}}}label", self.apk_info["app_name"])
+
+            try:
+                launcher_activity = None
+                for activity in root.findall('.//activity'):
+                    for intent in activity.findall('intent-filter'):
+                        has_main = any(a.get(f"{{{ANDROID_NS}}}name") == 'android.intent.action.MAIN' for a in intent.findall('action'))
+                        has_launcher = any(c.get(f"{{{ANDROID_NS}}}name") == 'android.intent.category.LAUNCHER' for c in intent.findall('category'))
+                        if has_main and has_launcher:
+                            launcher_activity = activity
+                            break
+                    if launcher_activity is not None:
+                        break
+
+                orientation_val = self.apk_info.get('orientation', 'portrait')
+                fullscreen_val = bool(self.apk_info.get('fullscreen', False))
+
+                if launcher_activity is not None:
+                    # 设置屏幕方向
+                    launcher_activity.set(f"{{{ANDROID_NS}}}screenOrientation", orientation_val)
+
+                    if fullscreen_val:
+                        launcher_activity.set(f"{{{ANDROID_NS}}}theme", "@android:style/Theme.NoTitleBar.Fullscreen")
+                    else:
+                        
+                        if f"{{{ANDROID_NS}}}theme" in launcher_activity.attrib:
+                            del launcher_activity.attrib[f"{{{ANDROID_NS}}}theme"]
+            except Exception:
+                pass
 
             tree.write(manifest_path, encoding="utf-8", xml_declaration=True)
 
@@ -85,26 +113,15 @@ class APKGenerator:
         if not os.path.exists(keystore_path):
             raise FileNotFoundError(f"未找到签名证书: {keystore_path}")
 
-        signature_script_path = get_resource_path(
-            os.path.join("py", "signature.py")
-        )
+        try:
+            from py.signature import sign_apk
+        except Exception as e:
+            raise RuntimeError(f"导入签名模块失败: {e}")
 
-        cmd = [
-            sys.executable,
-            signature_script_path,
-            unsigned_apk_path,
-            keystore_path,
-            alias,
-            password,
-            password
-        ]
-
-        result = subprocess.run(cmd, capture_output=True, text=True)
-
-        if result.returncode != 0:
-            raise RuntimeError(
-                f"签名失败：\n{result.stderr}\n\n{result.stdout}"
-            )
+        try:
+            sign_apk(unsigned_apk_path, keystore_path, alias, password, password)
+        except Exception as e:
+            raise RuntimeError(f"签名失败：{e}")
 
         return keystore_path
 
@@ -113,15 +130,37 @@ class APKGenerator:
         try:
             temp_dir = tempfile.mkdtemp(prefix="apk_build_")
 
-            template_apk = "apk_template/S.apk"
+            orientation = str(self.apk_info.get("orientation", "portrait"))
+            fullscreen = bool(self.apk_info.get("fullscreen", False))
+
+            if orientation == "portrait" and not fullscreen:
+                template_name = "S.apk"
+            elif orientation == "landscape" and not fullscreen:
+                template_name = "H.apk"
+            elif orientation == "portrait" and fullscreen:
+                template_name = "SQ.apk"
+            elif orientation == "landscape" and fullscreen:
+                template_name = "HQ.apk"
+            else:
+                template_name = "S.apk"
+
+            template_apk = get_resource_path(os.path.join("apk_template", template_name))
+
+            print(f"当前选择模板: {template_name} (orientation={orientation}, fullscreen={fullscreen})")
+            print(f"模板完整路径: {template_apk}")
+
             if not os.path.exists(template_apk):
                 raise FileNotFoundError(f"未找到模板 APK: {template_apk}")
 
             temp_apk_path = os.path.join(temp_dir, "temp.apk")
             shutil.copy2(template_apk, temp_apk_path)
 
-            if not self.modify_androidmanifest_apktool(temp_apk_path):
-                raise RuntimeError("修改 AndroidManifest.xml 失败")
+            try:
+                if not self.modify_androidmanifest_apktool(temp_apk_path):
+                    raise RuntimeError("使用 apktool 修改模板 AndroidManifest 失败")
+            except Exception as e:
+                print(f"修改模板 AndroidManifest 失败: {e}")
+                raise
 
             extract_dir = os.path.join(temp_dir, "extract")
             os.makedirs(extract_dir, exist_ok=True)
@@ -137,7 +176,6 @@ class APKGenerator:
                 res_mipmap_dir = os.path.join(extract_dir, "res", "mipmap")
                 os.makedirs(res_mipmap_dir, exist_ok=True)
                 shutil.copy2(self.apk_info["icon_path"], os.path.join(res_mipmap_dir, "icon.png"))
-
             unsigned_apk_path = os.path.join(temp_dir, "unsigned.apk")
             with zipfile.ZipFile(unsigned_apk_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
                 for root, _, files in os.walk(extract_dir):
@@ -265,7 +303,7 @@ class APKGenerator:
             ("软件名称:", "app_name", "灵光应用"),
             ("版本号:", "version_code", "1"),
             ("版本名称:", "version_name", "1.0.0"),
-            ("包名:", "package_name", "com.")
+            ("包名:", "package_name", "")
         ]
         
         for i, (label, key, default) in enumerate(labels):
@@ -357,29 +395,50 @@ class APKGenerator:
         orientation_frame.grid(row=row, column=1, sticky='w', pady=5, padx=5)
         
         orientation_var = tk.StringVar(value="portrait")
-        
-        # 使用 ttk 的 Radiobutton
+        fullscreen_var = tk.BooleanVar(value=False)
+
+        def update_selection_state():
+            orientation = str(orientation_var.get())
+            fullscreen = bool(fullscreen_var.get())
+            self.apk_info['orientation'] = orientation
+            self.apk_info['fullscreen'] = fullscreen
+
+        def set_orientation(value):
+            orientation_var.set(value)
+            update_selection_state()
+
+        def on_fullscreen_toggle():
+            try:
+                current = bool(fullscreen_var.get())
+            except Exception:
+                current = False
+            new = not current
+            fullscreen_var.set(new)
+            update_selection_state()
+
         ttk.Radiobutton(
             orientation_frame,
             text="竖屏",
             variable=orientation_var,
-            value="portrait"
+            value="portrait",
+            command=lambda v='portrait': set_orientation(v)
         ).pack(side=tk.LEFT, padx=5)
         
         ttk.Radiobutton(
             orientation_frame,
             text="横屏",
             variable=orientation_var,
-            value="landscape"
+            value="landscape",
+            command=lambda v='landscape': set_orientation(v)
         ).pack(side=tk.LEFT, padx=5)
 
         # 全屏选项
         row += 1
-        fullscreen_var = tk.BooleanVar()
         tk.Checkbutton(
             form_frame,
             text="全屏显示",
             variable=fullscreen_var,
+            command=on_fullscreen_toggle,
             bg=colors['white'],
             font=fonts['body'],
             fg=colors['text_primary']
@@ -403,13 +462,11 @@ class APKGenerator:
         
         def generate_apk():
             try:
+                update_selection_state()
+                print(f"用户选择: orientation={self.apk_info['orientation']}, fullscreen={self.apk_info['fullscreen']}")
                 self.apk_info.update({
                     k: entries[k].get().strip()
                     for k in ['app_name', 'version_code', 'version_name', 'package_name']
-                })
-                self.apk_info.update({
-                    "orientation": orientation_var.get(),
-                    "fullscreen": fullscreen_var.get()
                 })
 
                 if not all([

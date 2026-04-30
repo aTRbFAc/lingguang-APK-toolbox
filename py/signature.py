@@ -3,22 +3,29 @@ import sys
 import subprocess
 import argparse
 
+try:
+    from py.resource_utils import get_resource_path
+except ImportError:
+    def get_resource_path(relative_path):
+        try:
+            base_path = sys._MEIPASS
+        except AttributeError:
+            base_path = os.path.abspath(os.path.dirname(__file__))
+        return os.path.join(base_path, relative_path)
+
+
 def sign_apk(apk_path, keystore_path, alias, store_pass, key_pass):
     if not os.path.exists(apk_path):
         raise FileNotFoundError(f"APK 不存在: {apk_path}")
     if not os.path.exists(keystore_path):
         raise FileNotFoundError(f"Keystore 不存在: {keystore_path}")
 
-    base_dir = os.path.abspath(os.path.dirname(__file__))
-
-    apksigner = os.path.join(
-        base_dir,
-        "..",
+    apksigner = get_resource_path(os.path.join(
         "resources",
         "android-sdk",
         "build-tools",
         "apksigner.bat"
-    )
+    ))
 
     if not os.path.exists(apksigner):
         raise FileNotFoundError(f"找不到 apksigner: {apksigner}")
