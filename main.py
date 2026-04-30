@@ -161,7 +161,7 @@ class LicenseDialog:
 
 我已阅读、理解并同意上述所有条款。"""
         
-        license_text.insert('1.0.5', disclaimer_content)
+        license_text.insert('1.0', disclaimer_content)
         license_text.config(state='disabled')
         
         # 同意选项
@@ -1586,7 +1586,7 @@ class APKToolboxGUI:
         
         tk.Label(
             range_frame,
-            text="20秒",
+            text="10秒",
             font=('Microsoft YaHei', 9),
             bg='white',
             fg=self.colors['text_secondary']

@@ -57,6 +57,12 @@ class APKGenerator:
             if app is not None:
                 app.set(f"{{{ANDROID_NS}}}label", self.apk_info["app_name"])
 
+            provider_authority = f"{self.apk_info['package_name']}.fileProvider"
+            for provider in root.findall('.//provider'):
+                auth = provider.get(f"{{{ANDROID_NS}}}authorities")
+                if auth == "com.template.lingguang.fileProvider":
+                    provider.set(f"{{{ANDROID_NS}}}authorities", provider_authority)
+
             try:
                 launcher_activity = None
                 for activity in root.findall('.//activity'):
