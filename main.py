@@ -1586,7 +1586,7 @@ class APKToolboxGUI:
         
         tk.Label(
             range_frame,
-            text="20秒",
+            text="10秒",
             font=('Microsoft YaHei', 9),
             bg='white',
             fg=self.colors['text_secondary']
