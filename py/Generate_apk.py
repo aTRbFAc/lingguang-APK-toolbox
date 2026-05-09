@@ -6,18 +6,43 @@ import shutil
 import re
 import subprocess
 import tkinter as tk
-from tkinter import messagebox, filedialog, ttk
+from tkinter import messagebox, filedialog, ttk, simpledialog
 import xml.etree.ElementTree as ET
+
+from py.resource_utils import get_resource_path
 
 ANDROID_NS = "http://schemas.android.com/apk/res/android"
 
-def get_resource_path(relative_path):
-    """获取资源的绝对路径"""
-    if hasattr(sys, '_MEIPASS'):
-        return os.path.join(sys._MEIPASS, relative_path)
-    else:
-        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-        return os.path.join(base_dir, relative_path)
+
+# 单窗体输入 Keystore 别名和密码
+class KeystoreDialog(simpledialog.Dialog):
+    def __init__(self, parent, title=None):
+        super().__init__(parent, title=title)
+
+    def body(self, master):
+        tk.Label(master, text="签名别名:").grid(row=0, column=0, sticky='w', pady=5, padx=5)
+        self.alias_var = tk.StringVar()
+        self.alias_entry = tk.Entry(master, textvariable=self.alias_var)
+        self.alias_entry.grid(row=0, column=1, pady=5, padx=5)
+
+        tk.Label(master, text="Keystore 密码:").grid(row=1, column=0, sticky='w', pady=5, padx=5)
+        self.storepass_var = tk.StringVar()
+        self.storepass_entry = tk.Entry(master, textvariable=self.storepass_var, show='*')
+        self.storepass_entry.grid(row=1, column=1, pady=5, padx=5)
+
+        tk.Label(master, text="Key 密码:").grid(row=2, column=0, sticky='w', pady=5, padx=5)
+        self.keypass_var = tk.StringVar()
+        self.keypass_entry = tk.Entry(master, textvariable=self.keypass_var, show='*')
+        self.keypass_entry.grid(row=2, column=1, pady=5, padx=5)
+
+        return self.alias_entry
+
+    def apply(self):
+        self.result = (
+            self.alias_var.get().strip(),
+            self.storepass_var.get(),
+            self.keypass_var.get()
+        )
 
 
 class APKGenerator:
@@ -25,7 +50,8 @@ class APKGenerator:
         self.apk_info = {
             'app_name': '', 'version_code': '', 'version_name': '',
             'package_name': '', 'icon_path': '',
-            'orientation': 'portrait', 'fullscreen': False
+            'orientation': 'portrait', 'fullscreen': False,
+            'use_custom_keystore': False
         }
 
         self.jre_java = get_resource_path(
@@ -79,13 +105,11 @@ class APKGenerator:
                 fullscreen_val = bool(self.apk_info.get('fullscreen', False))
 
                 if launcher_activity is not None:
-                    # 设置屏幕方向
                     launcher_activity.set(f"{{{ANDROID_NS}}}screenOrientation", orientation_val)
 
                     if fullscreen_val:
                         launcher_activity.set(f"{{{ANDROID_NS}}}theme", "@android:style/Theme.NoTitleBar.Fullscreen")
                     else:
-                        
                         if f"{{{ANDROID_NS}}}theme" in launcher_activity.attrib:
                             del launcher_activity.attrib[f"{{{ANDROID_NS}}}theme"]
             except Exception:
@@ -103,33 +127,64 @@ class APKGenerator:
             return True
 
         except Exception as e:
-            print("apktool 执行失败:", e)
-            raise
-        finally:
-            if decode_dir and os.path.exists(decode_dir):
-                shutil.rmtree(decode_dir, ignore_errors=True)
+            raise RuntimeError(f"修改AndroidManifest失败: {str(e)}")
 
     def sign_apk_internal(self, unsigned_apk_path):
-        keystore_path = get_resource_path(
-            os.path.join("key", "lingguang_apktool.jks")
-        )
-        alias = "lingguang_apktool"
-        password = "lingguang.apktool.atrbfac.key"
-
-        if not os.path.exists(keystore_path):
-            raise FileNotFoundError(f"未找到签名证书: {keystore_path}")
-
         try:
-            from py.signature import sign_apk
-        except Exception as e:
-            raise RuntimeError(f"导入签名模块失败: {e}")
+            if bool(self.apk_info.get('use_custom_keystore', False)):
+                keystore_path = filedialog.askopenfilename(
+                    title="选择签名证书",
+                    filetypes=[("Keystore 文件", "*.jks;*.keystore;*.p12;*.pfx"), ("所有文件", "*")]
+                )
+                if not keystore_path:
+                    raise RuntimeError("用户取消选择签名证书")
+                
+                dlg = KeystoreDialog(None, title="签名信息")
+                if not getattr(dlg, 'result', None):
+                    raise RuntimeError("用户取消输入签名信息")
+                alias, store_pass, key_pass = dlg.result
+                
+                if not alias:
+                    raise RuntimeError("未输入签名别名")
+                if not store_pass:
+                    raise RuntimeError("未输入Keystore密码")
+                if not key_pass:
+                    key_pass = store_pass
+            else:
+                keystore_path = get_resource_path(
+                    os.path.join("key", "lingguang_apktool.jks")
+                )
+                alias = "lingguang_apktool"
+                store_pass = "lingguang.apktool.atrbfac.key"
+                key_pass = store_pass
 
-        try:
-            sign_apk(unsigned_apk_path, keystore_path, alias, password, password)
-        except Exception as e:
-            raise RuntimeError(f"签名失败：{e}")
+            if not os.path.exists(keystore_path):
+                raise FileNotFoundError(f"未找到签名证书: {keystore_path}")
 
-        return keystore_path
+            try:
+                from py.signature import sign_apk
+            except Exception as e:
+                raise RuntimeError(f"导入签名模块失败: {e}")
+
+            try:
+                sign_apk(unsigned_apk_path, keystore_path, alias, store_pass, key_pass)
+            except subprocess.CalledProcessError as e:
+                error_msg = str(e)
+                if "Keystore was tampered with" in error_msg or "Password verification failed" in error_msg:
+                    raise RuntimeError("签名失败：请检查密钥库密码是否正确\n\n常见原因：\n1. 密码输入错误\n2. 密钥库已损坏\n3. 别名或密码不匹配")
+                elif "alias does not exist" in error_msg.lower():
+                    raise RuntimeError("签名失败：签名别名不存在")
+                else:
+                    raise RuntimeError(f"签名失败：{error_msg}")
+            except Exception as e:
+                raise RuntimeError(f"签名失败：{str(e)}")
+
+            return keystore_path
+
+        except RuntimeError:
+            raise
+        except Exception as e:
+            raise RuntimeError(f"签名过程中发生错误：{str(e)}")
 
     def prepare_apk_files(self, extracted_path):
         temp_dir = None
@@ -152,9 +207,6 @@ class APKGenerator:
 
             template_apk = get_resource_path(os.path.join("apk_template", template_name))
 
-            print(f"当前选择模板: {template_name} (orientation={orientation}, fullscreen={fullscreen})")
-            print(f"模板完整路径: {template_apk}")
-
             if not os.path.exists(template_apk):
                 raise FileNotFoundError(f"未找到模板 APK: {template_apk}")
 
@@ -165,8 +217,7 @@ class APKGenerator:
                 if not self.modify_androidmanifest_apktool(temp_apk_path):
                     raise RuntimeError("使用 apktool 修改模板 AndroidManifest 失败")
             except Exception as e:
-                print(f"修改模板 AndroidManifest 失败: {e}")
-                raise
+                raise RuntimeError(f"修改模板 AndroidManifest 失败: {e}")
 
             extract_dir = os.path.join(temp_dir, "extract")
             os.makedirs(extract_dir, exist_ok=True)
@@ -176,12 +227,66 @@ class APKGenerator:
 
             assets_webapp_dir = os.path.join(extract_dir, "assets", "webapp")
             os.makedirs(assets_webapp_dir, exist_ok=True)
+
+            # 复制HTML文件
             shutil.copy2(extracted_path, os.path.join(assets_webapp_dir, "index.html"))
 
+            # 检查并复制资源文件夹
+            extracted_dir = os.path.dirname(extracted_path)
+            resource_dir = os.path.join(extracted_dir, "index_files")
+
+            if os.path.exists(resource_dir) and os.path.isdir(resource_dir):
+                target_resource_dir = os.path.join(assets_webapp_dir, "index_files")
+                
+                # 确保目标文件夹存在
+                os.makedirs(target_resource_dir, exist_ok=True)
+                
+                print(f"正在复制资源文件: {resource_dir} -> {target_resource_dir}")
+                
+                # 复制资源文件夹中的所有内容到目标文件夹
+                for item in os.listdir(resource_dir):
+                    source_path = os.path.join(resource_dir, item)
+                    target_path = os.path.join(target_resource_dir, item)
+                    
+                    if os.path.isfile(source_path):
+                        # 复制文件
+                        shutil.copy2(source_path, target_path)
+                        print(f"  复制文件: {item}")
+                    elif os.path.isdir(source_path):
+                        # 复制文件夹
+                        if os.path.exists(target_path):
+                            # 如果目标文件夹已存在，合并内容
+                            for sub_item in os.listdir(source_path):
+                                sub_source = os.path.join(source_path, sub_item)
+                                sub_target = os.path.join(target_path, sub_item)
+                                if os.path.isfile(sub_source):
+                                    shutil.copy2(sub_source, sub_target)
+                                else:
+                                    shutil.copytree(sub_source, sub_target, dirs_exist_ok=True)
+                        else:
+                            # 如果目标文件夹不存在，直接复制
+                            shutil.copytree(source_path, target_path)
+                        print(f"  复制文件夹: {item}")
+                
+                print(f"资源复制完成，共处理了 {len(os.listdir(resource_dir))} 个项")
+                
+                # 打印调试信息
+                print("目标资源文件夹内容:")
+                for root, dirs, files in os.walk(target_resource_dir):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        rel_path = os.path.relpath(file_path, target_resource_dir)
+                        rel_path = rel_path.replace('\\', '/')
+                        print(f"  - {rel_path}")
+            else:
+                print(f"未找到资源文件夹: {resource_dir}")
+
+            # 复制应用图标
             if self.apk_info.get("icon_path"):
                 res_mipmap_dir = os.path.join(extract_dir, "res", "mipmap")
                 os.makedirs(res_mipmap_dir, exist_ok=True)
                 shutil.copy2(self.apk_info["icon_path"], os.path.join(res_mipmap_dir, "icon.png"))
+            
             unsigned_apk_path = os.path.join(temp_dir, "unsigned.apk")
             with zipfile.ZipFile(unsigned_apk_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
                 for root, _, files in os.walk(extract_dir):
@@ -190,28 +295,26 @@ class APKGenerator:
                             os.path.join(root, f),
                             os.path.relpath(os.path.join(root, f), extract_dir)
                         )
-
+        
             keystore_used_path = self.sign_apk_internal(unsigned_apk_path)
-
+        
             safe_name = re.sub(r'[^\w\-_]', '_', self.apk_info['app_name'])
             safe_ver = re.sub(r'[^\w\-_.]', '_', self.apk_info['version_name'])
-
+        
             output_apk_path = filedialog.asksaveasfilename(
                 title="保存APK文件",
                 defaultextension=".apk",
                 initialfile=f"{safe_name}_{safe_ver}.apk",
                 filetypes=[("APK文件", "*.apk")]
             )
-
+        
             if not output_apk_path:
                 return None, "用户取消"
-
+        
             shutil.move(unsigned_apk_path, output_apk_path)
             return output_apk_path, keystore_used_path
-
+        
         except Exception as e:
-            import traceback
-            traceback.print_exc()
             raise
         finally:
             if temp_dir and os.path.exists(temp_dir):
@@ -223,7 +326,6 @@ class APKGenerator:
         return self.prepare_apk_files(extracted_path)
 
     def show_apk_info_dialog(self, extracted_path):
-        # 颜色方案
         colors = {
             'primary': '#4361ee',
             'primary_light': '#e0e7ff',
@@ -241,7 +343,6 @@ class APKGenerator:
             'accent': '#4361ee',
         }
         
-        # 字体设置
         fonts = {
             'h1': ('Microsoft YaHei', 20, 'bold'),
             'h2': ('Microsoft YaHei', 16, 'bold'),
@@ -257,15 +358,12 @@ class APKGenerator:
         apk_dialog.configure(bg=colors['light'])
         apk_dialog.resizable(False, False)
 
-        # 设置窗口图标
         try:
             icon_path = get_resource_path(os.path.join("icon", "icon.ico"))
             apk_dialog.iconbitmap(icon_path)
-        except Exception as e:
-            print(f"APK设置窗口图标加载失败: {e}")
+        except Exception:
             pass
 
-        # 居中显示
         apk_dialog.update_idletasks()
         width = 500
         height = 600
@@ -275,11 +373,9 @@ class APKGenerator:
         y = (screen_height - height) // 2
         apk_dialog.geometry(f'{width}x{height}+{x}+{y}')
         
-        # 主容器
         main_container = tk.Frame(apk_dialog, bg=colors['light'], padx=20, pady=20)
         main_container.pack(fill=tk.BOTH, expand=True)
         
-        # 标题
         title_frame = tk.Frame(main_container, bg=colors['light'])
         title_frame.pack(fill=tk.X, pady=10)
         
@@ -291,7 +387,6 @@ class APKGenerator:
             fg=colors['primary']
         ).pack()
         
-        # 表单卡片
         form_card = tk.Frame(
             main_container,
             bg=colors['white'],
@@ -299,11 +394,9 @@ class APKGenerator:
             bd=1
         )
         form_card.pack(fill=tk.BOTH, expand=True, pady=10)
-        
-        # 表单内容
         form_frame = tk.Frame(form_card, bg=colors['white'], padx=20, pady=20)
         form_frame.pack(fill=tk.BOTH, expand=True)
-        
+
         entries = {}
         labels = [
             ("软件名称:", "app_name", "灵光应用"),
@@ -311,19 +404,17 @@ class APKGenerator:
             ("版本名称:", "version_name", "1.0.0"),
             ("包名:", "package_name", "")
         ]
-        
-        for i, (label, key, default) in enumerate(labels):
-            # 标签
+
+        for i, (label_text, key, default) in enumerate(labels):
             tk.Label(
                 form_frame,
-                text=label,
+                text=label_text,
                 font=fonts['body'],
                 bg=colors['white'],
                 fg=colors['text_secondary'],
                 anchor='w'
             ).grid(row=i, column=0, sticky='w', pady=5, padx=5)
-            
-            # 输入框
+
             e = tk.Entry(
                 form_frame,
                 font=fonts['body'],
@@ -335,8 +426,7 @@ class APKGenerator:
             e.insert(0, default)
             e.grid(row=i, column=1, sticky='ew', pady=5, padx=5)
             entries[key] = e
-        
-        # 图标选择
+
         row = len(labels)
         tk.Label(
             form_frame,
@@ -386,7 +476,6 @@ class APKGenerator:
             command=select_icon
         ).pack(side=tk.RIGHT)
         
-        # 屏幕方向
         row += 1
         tk.Label(
             form_frame,
@@ -414,10 +503,7 @@ class APKGenerator:
             update_selection_state()
 
         def on_fullscreen_toggle():
-            try:
-                current = bool(fullscreen_var.get())
-            except Exception:
-                current = False
+            current = fullscreen_var.get()
             new = not current
             fullscreen_var.set(new)
             update_selection_state()
@@ -427,7 +513,7 @@ class APKGenerator:
             text="竖屏",
             variable=orientation_var,
             value="portrait",
-            command=lambda v='portrait': set_orientation(v)
+            command=lambda: set_orientation("portrait")
         ).pack(side=tk.LEFT, padx=5)
         
         ttk.Radiobutton(
@@ -435,10 +521,9 @@ class APKGenerator:
             text="横屏",
             variable=orientation_var,
             value="landscape",
-            command=lambda v='landscape': set_orientation(v)
+            command=lambda: set_orientation("landscape")
         ).pack(side=tk.LEFT, padx=5)
 
-        # 全屏选项
         row += 1
         tk.Checkbutton(
             form_frame,
@@ -449,11 +534,31 @@ class APKGenerator:
             font=fonts['body'],
             fg=colors['text_primary']
         ).grid(row=row, column=1, sticky='w', pady=5, padx=5)
+
+        row += 1
+        self.custom_keystore_checked = False
         
-        # 设置列权重
+        def on_custom_keystore_click():
+            self.custom_keystore_checked = not self.custom_keystore_checked
+            if self.custom_keystore_checked:
+                custom_checkbox.select()
+            else:
+                custom_checkbox.deselect()
+            self.apk_info['use_custom_keystore'] = self.custom_keystore_checked
+
+        custom_checkbox = tk.Checkbutton(
+            form_frame,
+            text="使用独立签名文件",
+            command=on_custom_keystore_click,
+            bg=colors['white'],
+            font=fonts['body'],
+            fg=colors['text_primary']
+        )
+        custom_checkbox.grid(row=row, column=1, sticky='w', pady=5, padx=5)
+        custom_checkbox.deselect()
+
         form_frame.columnconfigure(1, weight=1)
         
-        # 提示信息
         tk.Label(
             main_container,
             text="提示：图标请使用PNG格式，尺寸为512x512像素",
@@ -462,18 +567,18 @@ class APKGenerator:
             fg=colors['text_secondary']
         ).pack(pady=10)
         
-        # 按钮区域
         button_frame = tk.Frame(main_container, bg=colors['light'])
         button_frame.pack(fill=tk.X, pady=10)
         
         def generate_apk():
             try:
-                update_selection_state()
-                print(f"用户选择: orientation={self.apk_info['orientation']}, fullscreen={self.apk_info['fullscreen']}")
                 self.apk_info.update({
                     k: entries[k].get().strip()
                     for k in ['app_name', 'version_code', 'version_name', 'package_name']
                 })
+                update_selection_state()
+                
+                self.apk_info['use_custom_keystore'] = self.custom_keystore_checked
 
                 if not all([
                     self.apk_info["app_name"],
@@ -501,9 +606,8 @@ class APKGenerator:
                     apk_dialog.destroy()
 
             except Exception as e:
-                messagebox.showerror("错误", f"APK生成失败：\n{str(e)}")
+                messagebox.showerror("APK生成失败", str(e))
         
-        # 生成按钮
         tk.Button(
             button_frame,
             text="生成APK",
@@ -518,7 +622,6 @@ class APKGenerator:
             command=generate_apk
         ).pack(side=tk.RIGHT, padx=5)
         
-        # 取消按钮
         tk.Button(
             button_frame,
             text="取消",

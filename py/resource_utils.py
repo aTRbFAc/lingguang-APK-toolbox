@@ -16,8 +16,8 @@ def get_resource_path(relative_path):
         # PyInstaller创建临时文件夹存储资源
         base_path = sys._MEIPASS
     except Exception:
-        # 开发环境
-        base_path = os.path.abspath(".")
+        # 开发环境：使用项目根目录
+        base_path = os.path.dirname(os.path.dirname(__file__))
     
     # 调试信息
     # print(f"资源路径: {relative_path}")

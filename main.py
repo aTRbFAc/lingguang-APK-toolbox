@@ -467,6 +467,11 @@ class APKToolboxGUI:
         
         # 加载配置
         self.config = load_config()
+
+        # 加载离线模式默认值
+        if 'offline_mode' not in self.config:
+            self.config['offline_mode'] = True
+            save_config(self.config)
         
         # 初始化状态
         self.extraction_thread = None
@@ -802,7 +807,7 @@ class APKToolboxGUI:
         # 版权信息
         tk.Label(
             status_bar,
-            text="© 2026 文幻工作室 | 灵光APK工具箱 v1.0.5",
+            text="© 2026 文幻工作室 | 灵光APK工具箱 v1.1",
             font=self.fonts['small'],
             bg=self.colors['dark'],
             fg='white',
@@ -890,12 +895,14 @@ class APKToolboxGUI:
     
     def update_extraction_progress(self):
         """更新提取进度"""
+
         wait_time = self.config['wait_time']
-        
+        offline_mode = self.config.get('offline_mode', True)
+
         # 步骤1: 解析链接 (0-20%)
         if self.progress_dialog:
             self.root.after(0, lambda: self.progress_dialog.update_status("正在解析链接..."))
-        
+
         step_time = wait_time * 0.2
         for i in range(0, 21):
             if not self.progress_running or self.extraction_completed:
@@ -903,17 +910,17 @@ class APKToolboxGUI:
             if self.progress_dialog:
                 self.root.after(0, lambda v=i: self.progress_dialog.update_progress(v))
             time.sleep(step_time / 15)
-        
+
         if self.extraction_completed:
             if self.progress_dialog:
                 self.root.after(0, lambda: self.progress_dialog.update_progress(100, "处理完成"))
             time.sleep(0.5)
             return
-        
+
         # 步骤2: 获取内容 (20-50%)
         if self.progress_dialog:
             self.root.after(0, lambda: self.progress_dialog.update_status("正在获取网页内容..."))
-        
+
         step_time = wait_time * 0.3
         for i in range(21, 51):
             if not self.progress_running or self.extraction_completed:
@@ -921,17 +928,20 @@ class APKToolboxGUI:
             if self.progress_dialog:
                 self.root.after(0, lambda v=i: self.progress_dialog.update_progress(v))
             time.sleep(step_time / 20)
-        
+
         if self.extraction_completed:
             if self.progress_dialog:
                 self.root.after(0, lambda: self.progress_dialog.update_progress(100, "处理完成"))
             time.sleep(0.5)
             return
-        
+
         # 步骤3: 处理数据 (50-80%)
         if self.progress_dialog:
-            self.root.after(0, lambda: self.progress_dialog.update_status("正在处理数据..."))
-        
+            if offline_mode:
+                self.root.after(0, lambda: self.progress_dialog.update_status("正在处理数据与资源..."))
+            else:
+                self.root.after(0, lambda: self.progress_dialog.update_status("正在处理数据..."))
+
         step_time = wait_time * 0.3
         for i in range(51, 81):
             if not self.progress_running or self.extraction_completed:
@@ -939,35 +949,67 @@ class APKToolboxGUI:
             if self.progress_dialog:
                 self.root.after(0, lambda v=i: self.progress_dialog.update_progress(v))
             time.sleep(step_time / 20)
-        
+
         if self.extraction_completed:
             if self.progress_dialog:
                 self.root.after(0, lambda: self.progress_dialog.update_progress(100, "处理完成"))
             time.sleep(0.5)
             return
-        
-        # 步骤4: 生成结果 (80-95%)
-        if self.progress_dialog:
-            self.root.after(0, lambda: self.progress_dialog.update_status("正在生成结果..."))
-        
-        step_time = wait_time * 0.3
-        for i in range(81, 96):
-            if not self.progress_running or self.extraction_completed:
-                break
+
+        # 如果是离线模式，添加资源下载阶段
+        if offline_mode:
+            # 步骤4: 下载资源 (80-90%)
             if self.progress_dialog:
-                self.root.after(0, lambda v=i: self.progress_dialog.update_progress(v))
-            time.sleep(step_time / 10)
-        
+                self.root.after(0, lambda: self.progress_dialog.update_status("正在下载外部资源..."))
+
+            step_time = wait_time * 0.2
+            for i in range(81, 91):
+                if not self.progress_running or self.extraction_completed:
+                    break
+                if self.progress_dialog:
+                    self.root.after(0, lambda v=i: self.progress_dialog.update_progress(v))
+                time.sleep(step_time / 10)
+
+            if self.extraction_completed:
+                if self.progress_dialog:
+                    self.root.after(0, lambda: self.progress_dialog.update_progress(100, "处理完成"))
+                time.sleep(0.5)
+                return
+
+            # 步骤5: 生成结果 (90-95%)
+            if self.progress_dialog:
+                self.root.after(0, lambda: self.progress_dialog.update_status("正在生成结果..."))
+
+            step_time = wait_time * 0.1
+            for i in range(91, 96):
+                if not self.progress_running or self.extraction_completed:
+                    break
+                if self.progress_dialog:
+                    self.root.after(0, lambda v=i: self.progress_dialog.update_progress(v))
+                time.sleep(step_time / 5)
+        else:
+            # 非离线模式：步骤4: 生成结果 (80-95%)
+            if self.progress_dialog:
+                self.root.after(0, lambda: self.progress_dialog.update_status("正在生成结果..."))
+
+            step_time = wait_time * 0.3
+            for i in range(81, 96):
+                if not self.progress_running or self.extraction_completed:
+                    break
+                if self.progress_dialog:
+                    self.root.after(0, lambda v=i: self.progress_dialog.update_progress(v))
+                time.sleep(step_time / 10)
+
         if self.extraction_completed:
             if self.progress_dialog:
                 self.root.after(0, lambda: self.progress_dialog.update_progress(100, "处理完成"))
             time.sleep(0.5)
             return
-        
+
         # 减速阶段: 95-99%
         if self.progress_dialog:
             self.root.after(0, lambda: self.progress_dialog.update_status("即将完成..."))
-        
+
         step_time = wait_time * 0.15
         for i in range(96, 100):
             if not self.progress_running or self.extraction_completed:
@@ -975,11 +1017,11 @@ class APKToolboxGUI:
             if self.progress_dialog:
                 self.root.after(0, lambda v=i: self.progress_dialog.update_progress(v))
             time.sleep(step_time / 2)  # 更慢的速度
-        
+
         # 等待提取完成
         if self.progress_dialog:
             self.root.after(0, lambda: self.progress_dialog.update_status("正在完成最后处理..."))
-        
+
         # 卡在99%直到提取完成
         start_wait_time = time.time()
         while not self.extraction_completed and self.progress_running:
@@ -987,13 +1029,13 @@ class APKToolboxGUI:
             if elapsed > wait_time * 0.5:  # 最多等待一半的等待时间
                 break
             time.sleep(0.1)
-        
+
         # 如果提取完成，跳到100%
         if self.extraction_completed and self.progress_running:
             if self.progress_dialog:
                 self.root.after(0, lambda: self.progress_dialog.update_progress(100, "处理完成"))
             time.sleep(0.5)
-    
+
     def run_extraction(self, url):
         """运行提取过程"""
         try:
@@ -1003,6 +1045,33 @@ class APKToolboxGUI:
             content = extract_nested_iframe_content(url)
             
             if content is not None:
+                # 如果启用离线模式，处理资源本地化
+                if self.config.get('offline_mode', True):
+                    try:
+                        # 导入资源本地化模块
+                        from py.localize_resources import localize_html_resources
+                        
+                        # 更新状态
+                        if self.progress_dialog:
+                            self.root.after(0, lambda: self.progress_dialog.update_status("正在处理离线资源..."))
+                        
+                        # 处理资源本地化
+                        processed_content, resource_dir, localizer = localize_html_resources(
+                            content, 
+                            base_url=url,
+                            offline_mode=True
+                        )
+                        content = processed_content
+                        
+                        # 保存localizer实例
+                        self.localizer = localizer
+                        
+                    except Exception as e:
+                        print(f"资源本地化处理失败，继续使用原始HTML: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        self.localizer = None
+                
                 # 保存提取的内容到实例变量
                 self.extracted_content = content
                 self.extraction_completed = True
@@ -1016,40 +1085,83 @@ class APKToolboxGUI:
         except Exception as e:
             self.progress_running = False
             self.extraction_completed = True
+            # 清理资源
+            if hasattr(self, 'localizer'):
+                try:
+                    import shutil
+                    shutil.rmtree(self.localizer.get_output_dir(), ignore_errors=True)
+                except:
+                    pass
             self.root.after(0, self.on_extraction_error, str(e))
-    
+
     def on_extraction_complete_with_content(self):
         """提取完成并获取到内容后的回调"""
         # 关闭进度条弹窗
         if self.progress_dialog:
             self.root.after(0, self.progress_dialog.close)
-        
+
         # 更新主界面状态
         self.status_icon_label.config(text="✓", fg=self.colors['success'])
         self.status_text_label.config(text="提取完成", fg=self.colors['success'])
-        
+
         # 弹出文件保存对话框
         file_path = filedialog.asksaveasfilename(
             title="保存提取的HTML文件",
             defaultextension=".html",
             filetypes=[("HTML文件", "*.html"), ("所有文件", "*.*")]
         )
-        
+
         if not file_path:
+            # 清理临时目录
+            if hasattr(self, 'temp_dir') and self.temp_dir:
+                import shutil
+                shutil.rmtree(self.temp_dir, ignore_errors=True)
             self.reset_extraction_ui()
             return
-        
+
         # 保存文件
         try:
+            # 保存HTML文件
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(self.extracted_content)
-            
+
+            # 如果有资源文件夹，复制到HTML文件所在目录
+            if hasattr(self, 'resource_dir') and self.resource_dir and os.path.exists(self.resource_dir):
+                import shutil
+                html_dir = os.path.dirname(file_path)
+                target_resource_dir = os.path.join(html_dir, "index_files")
+
+                # 如果目标文件夹已存在，先删除
+                if os.path.exists(target_resource_dir):
+                    shutil.rmtree(target_resource_dir)
+
+                # 复制资源文件夹
+                shutil.copytree(self.resource_dir, target_resource_dir)
+                print(f"资源文件夹已复制到: {target_resource_dir}")
+
+                # 更新HTML文件中的资源路径（如果需要）
+                html_content = self.extracted_content
+                if self.config.get('offline_mode', True):
+                    # 确保资源路径正确
+                    html_content = html_content.replace(f"./{os.path.basename(self.resource_dir)}/", "./index_files/")
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.write(html_content)
+
             self.extracted_path = os.path.abspath(file_path)
+
+            # 清理临时目录
+            if hasattr(self, 'temp_dir') and self.temp_dir:
+                shutil.rmtree(self.temp_dir, ignore_errors=True)
+                delattr(self, 'temp_dir')
+
             self.show_result_dialog()
-            
+
         except Exception as e:
+            # 清理临时目录
+            if hasattr(self, 'temp_dir') and self.temp_dir:
+                shutil.rmtree(self.temp_dir, ignore_errors=True)
             self.root.after(0, self.on_extraction_error, f"保存文件时出错: {str(e)}")
-    
+
     def reset_extraction_ui(self):
         """重置提取UI状态"""
         # 启用输入框和按钮
@@ -1070,89 +1182,63 @@ class APKToolboxGUI:
         self.progress_running = False
         self.extraction_completed = False
     
-    def on_extraction_error(self, error_msg):
-        """提取错误"""
+    def on_extraction_complete_with_content(self):
+        """提取完成并获取到内容后的回调"""
         # 关闭进度条弹窗
         if self.progress_dialog:
             self.root.after(0, self.progress_dialog.close)
-        
-        # 更新主界面状态
-        self.status_icon_label.config(text="❌", fg=self.colors['danger'])
-        self.status_text_label.config(text="提取失败", fg=self.colors['danger'])
-        
-        # 更新UI
-        self.extract_btn.configure(state='normal')
-        self.input_text.configure(state='normal')
-        self.global_status.configure(text="提取失败")
-        
-        # 显示错误消息
-        error_dialog = Toplevel(self.root)
-        error_dialog.title("提取失败")
-        error_dialog.geometry("400x200")
-        error_dialog.configure(bg='white')
-        error_dialog.transient(self.root)
-        error_dialog.grab_set()
 
-        # 设置窗口图标
+        # 更新主界面状态
+        self.status_icon_label.config(text="✓", fg=self.colors['success'])
+        self.status_text_label.config(text="提取完成", fg=self.colors['success'])
+
+        # 弹出文件保存对话框
+        file_path = filedialog.asksaveasfilename(
+            title="保存提取的HTML文件",
+            defaultextension=".html",
+            filetypes=[("HTML文件", "*.html"), ("所有文件", "*.*")]
+        )
+
+        if not file_path:
+            # 清理资源
+            if hasattr(self, 'localizer'):
+                try:
+                    import shutil
+                    shutil.rmtree(self.localizer.get_output_dir(), ignore_errors=True)
+                except:
+                    pass
+            self.reset_extraction_ui()
+            return
+
+        # 保存文件
         try:
-            icon_path = get_resource_path(os.path.join("icon", "icon.ico"))
-            error_dialog.iconbitmap(icon_path)
+            # 保存HTML文件
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(self.extracted_content)
+
+            # 如果有localizer实例，复制资源文件
+            if hasattr(self, 'localizer') and self.localizer:
+                html_dir = os.path.dirname(file_path)
+
+                # 复制资源到HTML文件所在目录
+                self.localizer.copy_resources_to(html_dir)
+
+                # 清理临时目录
+                try:
+                    shutil.rmtree(self.localizer.get_output_dir(), ignore_errors=True)
+                except:
+                    pass
+                
+            self.extracted_path = os.path.abspath(file_path)
+            self.show_result_dialog()
+
         except Exception as e:
-            print(f"错误对话框图标加载失败: {e}")
-            pass
-        
-        # 居中显示
-        window_width = 400
-        window_height = 200
-        screen_width = error_dialog.winfo_screenwidth()
-        screen_height = error_dialog.winfo_screenheight()
-        x = (screen_width - window_width) // 2
-        y = (screen_height - window_height) // 2
-        error_dialog.geometry(f'{window_width}x{window_height}+{x}+{y}')
-        
-        # 错误信息
-        tk.Label(
-            error_dialog,
-            text="错误",
-            font=('Segoe UI', 20, 'bold'),
-            bg='white',
-            fg=self.colors['danger']
-        ).pack(pady=20)
-        
-        # 错误信息
-        tk.Label(
-            error_dialog,
-            text="提取过程中发生错误",
-            font=('Segoe UI', 12, 'bold'),
-            bg='white',
-            fg=self.colors['dark']
-        ).pack(pady=(0, 5))
-        
-        tk.Label(
-            error_dialog,
-            text=error_msg[:100] + "..." if len(error_msg) > 100 else error_msg,
-            font=('Segoe UI', 9),
-            bg='white',
-            fg=self.colors['text_secondary'],
-            wraplength=350
-        ).pack(pady=(0, 20))
-        
-        # 确定按钮 - 改为蓝色主题
-        tk.Button(
-            error_dialog,
-            text="确定",
-            font=('Microsoft YaHei', 10),
-            bg=self.colors['primary'],  # 蓝色
-            fg='white',
-            activebackground='#3a56d4',  # 深蓝色
-            activeforeground='white',
-            relief='flat',
-            cursor='hand2',
-            command=error_dialog.destroy
-        ).pack()
-        
-        self.is_extracting = False
-    
+            # 清理资源
+            if hasattr(self, 'localizer'):
+                try:
+                    shutil.rmtree(self.localizer.get_output_dir(), ignore_errors=True)
+                except:
+                    pass
     def show_result_dialog(self):
         """显示结果弹窗"""
         result_dialog = Toplevel(self.root)
@@ -1299,6 +1385,29 @@ class APKToolboxGUI:
         
         # 重置UI
         self.reset_extraction_ui()
+    
+    def on_extraction_error(self, error_msg):
+        """提取出错的回调"""
+        # 关闭进度条弹窗
+        if self.progress_dialog:
+            self.progress_dialog.close()
+        
+        # 弹出错误消息
+        messagebox.showerror("提取失败", f"提取过程中发生错误：\n\n{error_msg}")
+        
+        # 重置UI
+        self.reset_extraction_ui()
+    
+    def reset_extraction_ui(self):
+        """重置提取UI状态"""
+        self.input_text.configure(state='normal')
+        self.extract_btn.configure(state='normal')
+        self.global_status.configure(text="就绪：粘贴包含链接的文本，然后点击开始提取")
+        self.status_icon_label.config(text="⏳", fg=self.colors['text_secondary'])
+        self.status_text_label.config(text="等待开始提取", fg=self.colors['text_primary'])
+        self.is_extracting = False
+        self.progress_running = False
+        self.extraction_completed = False
     
     def generate_apk_with_info(self, parent_dialog):
         """使用收集的信息生成APK"""
@@ -1488,10 +1597,13 @@ class APKToolboxGUI:
     def show_settings(self):
         """显示设置窗口"""
         cfg = load_config()
+
+        if 'offline_mode' not in cfg:
+            cfg['offline_mode'] = True
         
         settings_dialog = Toplevel(self.root)
         settings_dialog.title("设置")
-        settings_dialog.geometry("450x450")
+        settings_dialog.geometry("450x650")
         settings_dialog.configure(bg='white')
         settings_dialog.resizable(False, False)
 
@@ -1504,7 +1616,7 @@ class APKToolboxGUI:
 
         # 居中显示
         window_width = 450
-        window_height = 450
+        window_height = 650
         screen_width = settings_dialog.winfo_screenwidth()
         screen_height = settings_dialog.winfo_screenheight()
         x = (screen_width - window_width) // 2
@@ -1530,7 +1642,57 @@ class APKToolboxGUI:
         # 设置项框架
         settings_frame = tk.Frame(container, bg='white')
         settings_frame.pack(fill=tk.X, pady=(0, 30))
-        
+
+        # 离线模式设置
+        tk.Label(
+            settings_frame,
+            text="离线模式支持：",
+            font=('Microsoft YaHei', 11, 'bold'),
+            bg='white',
+            fg=self.colors['dark']
+        ).pack(anchor=tk.W, pady=(0, 10))
+
+        offline_mode_var = tk.BooleanVar()
+        offline_mode_var.set(bool(cfg['offline_mode']))
+
+        offline_checkbox = tk.Checkbutton(
+            settings_frame,
+            text="启用离线资源提取",
+            variable=offline_mode_var,
+            font=('Microsoft YaHei', 10),
+            bg='white',
+            fg=self.colors['text_primary'],
+            activebackground='white',
+            activeforeground=self.colors['text_primary'],
+            selectcolor='white',
+            anchor='w'
+        )
+        offline_checkbox.pack(fill=tk.X, pady=(0, 15))
+
+        # 离线模式描述
+        offline_desc = tk.Text(
+            settings_frame,
+            height=5,
+            font=('Microsoft YaHei', 9),
+            bg=self.colors['light'],
+            fg=self.colors['text_secondary'],
+            wrap=tk.WORD,
+            relief='flat',
+            padx=10,
+            pady=5
+        )
+        offline_desc.pack(fill=tk.X, pady=(0, 20))
+        offline_desc.insert('1.0',
+            "启用后，程序会自动下载HTML中的外部资源（JS、CSS、图片等），并将链接替换为本地路径。\n"
+            "这样可以确保应用在离线状态下也能正常工作。\n"
+            "注意：开启离线模式支持后，提取到的文件可能会出现CORS跨域错误，请使用http-server启动本地服务（打包后不受限制）"
+        )
+        offline_desc.config(state='disabled')
+
+        #分割线
+        separator = tk.Frame(settings_frame, height=1, bg=self.colors['border'])
+        separator.pack(fill=tk.X, pady=20)
+
         # 页面加载时间设置
         tk.Label(
             settings_frame,
@@ -1617,6 +1779,7 @@ class APKToolboxGUI:
         
         def save_settings():
             cfg["wait_time"] = time_var.get()
+            cfg["offline_mode"] = bool(offline_mode_var.get())
             save_config(cfg)
             self.config = cfg
             settings_dialog.destroy()

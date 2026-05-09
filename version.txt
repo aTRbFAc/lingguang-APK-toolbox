@@ -1,0 +1,32 @@
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(1, 1, 0, 0),
+    prodvers=(1, 1, 0, 0),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+  ),
+  kids=[
+    StringFileInfo(
+      [
+        StringTable(
+          u'040904B0',
+          [
+            StringStruct(u'CompanyName', u'文幻工作室'),
+            StringStruct(u'FileDescription', u'一款自动化提取灵光闪应用网页内容并转换为APK应用的工具'),
+            StringStruct(u'FileVersion', u'1.1.0.0'),
+            StringStruct(u'InternalName', u'灵光APK工具箱'),
+            StringStruct(u'LegalCopyright', u'Copyright © 2026 灵光工作室. 保留所有权利。'),
+            StringStruct(u'OriginalFilename', u'灵光APK工具箱.exe'),
+            StringStruct(u'ProductName', u'灵光APK工具箱'),
+            StringStruct(u'ProductVersion', u'1.1.0.0')
+          ]
+        )
+      ]
+    ),
+    VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
+  ]
+)
