@@ -20,15 +20,19 @@
 ### 打包界面
 ![打包界面](Screen/pack.jpg)
 
+### 设置界面
+![设置界面](Screen/setting.jpg)
+
 ## 功能特性
 
 - **智能链接提取**：自动识别并提取灵光分享链接中的网页内容
 - **APK打包**：将提取的网页内容转换为可安装的Android APK应用
 - **自定义应用信息**：支持设置应用名称、版本号、包名等信息
 - **图标自定义**：支持自定义应用图标
-- **自动签名**：内置签名证书，自动为生成的APK进行数字签名
+- **自动签名**：内置签名证书或使用独立签名证书，自动为生成的APK进行数字签名
 - **用户友好界面**：简洁直观的图形化界面，操作简单
 - **可配置参数**：支持调整等待时间等参数
+- **离线模式支持**：自动下载HTML中的外部资源，确保应用在离线状态下也能正常工作
 - **免责声明**：内置用户协议和免责声明，确保合规使用
 
 ## 安装说明
@@ -37,7 +41,7 @@
 
 - **操作系统**：Windows 10/11
 - **Python版本**：3.7 或更高版本
-- **依赖库**：tkinter, PIL, playwright, ttkbootstrap
+- **依赖库**：tkinter, PIL, playwright, ttkbootstrap, beautifulsoup4, requests, lxml
 
 ### 安装步骤
 
@@ -106,21 +110,23 @@
 
 ```
 灵光APK工具箱/
-├── main.py                # 主程序入口，GUI界面
+├── main.py                   # 主程序入口，GUI界面
 ├── py/
-│   ├── config.py          # 配置文件管理
-│   ├── extract_iframe.py  # 网页内容提取模块
-│   ├── Generate_apk.py    # APK生成模块
-│   └── signature.py       # APK签名模块
-├── apk_template/          # APK模板文件
-├── resources/             # 资源文件
-├── key/                   # 签名证书
-├── icon/                  # 应用图标
-├── images/                # 界面图片资源
-├── Screen/                # 软件截图
-├── config.json            # 配置文件
-├── requirements.txt       # Python依赖
-└── README.md              # 项目说明
+│   ├── config.py             # 配置文件管理
+│   ├── extract_iframe.py     # 网页内容提取模块
+│   ├── Generate_apk.py       # APK生成模块
+│   ├── localize_resources.py # 网页内容提取模块（离线模式支持）
+│   ├── resource_utils.py     # 资源路径处理模块
+│   └── signature.py          # APK签名模块
+├── apk_template/             # APK模板文件
+├── resources/                # 资源文件
+├── key/                      # 签名证书
+├── icon/                     # 应用图标
+├── images/                   # 界面图片资源
+├── Screen/                   # 软件截图
+├── config.json               # 配置文件
+├── requirements.txt          # Python依赖
+└── README.md                 # 项目说明
 ```
 
 ## 技术栈
@@ -137,7 +143,8 @@
 
 ```json
 {
-    "wait_time": 20  // 网页加载等待时间（秒）
+    "wait_time": 20,  // 网页加载等待时间（秒）
+    "offline_mode": false  // 是否启用离线模式
 }
 ```
 
