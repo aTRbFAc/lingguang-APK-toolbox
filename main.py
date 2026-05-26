@@ -807,7 +807,7 @@ class APKToolboxGUI:
         # 版权信息
         tk.Label(
             status_bar,
-            text="© 2026 文幻工作室 | 灵光APK工具箱 v1.1",
+            text="© 2026 文幻工作室 | 灵光APK工具箱 v1.1.5",
             font=self.fonts['small'],
             bg=self.colors['dark'],
             fg='white',
@@ -1500,7 +1500,7 @@ class APKToolboxGUI:
         # 版本
         tk.Label(
             container,
-            text="版本 1.0.0",
+            text="版本 1.1.5",
             font=('Segoe UI', 10),
             bg='white',
             fg=self.colors['text_secondary']
