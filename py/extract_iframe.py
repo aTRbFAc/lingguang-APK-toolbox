@@ -61,7 +61,7 @@ def extract_nested_iframe_content(url, output_filename="extracted_content.html")
                     console.log('[DEBUG] 外层 iframe 总数:', allIframes.length);
 
                     if (allIframes.length === 0) {
-                        console.log('[DEBUG] ❌ 页面中没有找到任何符合条件的 iframe');
+                        console.log('[DEBUG]页面中没有找到任何符合条件的 iframe');
                         return {
                             success: false,
                             message: '未找到任何 sandbox 包含 allow-scripts allow-same-origin 的 iframe'
@@ -79,9 +79,9 @@ def extract_nested_iframe_content(url, output_filename="extracted_content.html")
 
                         try {
                             contentDoc = iframe.contentDocument || iframe.contentWindow?.document;
-                            console.log('[DEBUG] ✅ 成功进入 iframe DOM');
+                            console.log('[DEBUG]成功进入 iframe DOM');
                         } catch (e) {
-                            console.log('[DEBUG] ❌ 无法进入 iframe DOM（跨域）:', e.message);
+                            console.log('[DEBUG]无法进入 iframe DOM（跨域）:', e.message);
                         }
 
                         if (!contentDoc && iframe.srcdoc) {
@@ -90,7 +90,7 @@ def extract_nested_iframe_content(url, output_filename="extracted_content.html")
                         }
 
                         if (!contentDoc) {
-                            console.log('[DEBUG] ❌ 无法获取 iframe 的 document，跳过');
+                            console.log('[DEBUG]无法获取 iframe 的 document，跳过');
                             continue;
                         }
 
@@ -98,7 +98,7 @@ def extract_nested_iframe_content(url, output_filename="extracted_content.html")
                         console.log('[DEBUG] 内层 iframe 数量:', innerIframes.length);
 
                         if (innerIframes.length === 0) {
-                            console.log('[DEBUG] ❌ 该 iframe 中未找到内层 iframe');
+                            console.log('[DEBUG]该 iframe 中未找到内层 iframe');
                             continue;
                         }
 
@@ -109,19 +109,19 @@ def extract_nested_iframe_content(url, output_filename="extracted_content.html")
 
                             const srcdoc = innerIframe.getAttribute('srcdoc');
                             if (srcdoc) {
-                                console.log('[DEBUG] ✅ 成功提取 srcdoc');
+                                console.log('[DEBUG]成功提取 srcdoc');
                                 return {
                                     success: true,
                                     content: srcdoc,
                                     source: 'inner_iframe_srcdoc'
                                 };
                             } else {
-                                console.log('[DEBUG] ❌ 该内层 iframe 没有 srcdoc');
+                                console.log('[DEBUG]该内层 iframe 没有 srcdoc');
                             }
                         }
                     }
 
-                    console.log('[DEBUG] ❌ 所有 iframe 都检查完毕，未找到目标 srcdoc');
+                    console.log('[DEBUG]所有 iframe 都检查完毕，未找到目标 srcdoc');
                     return {
                         success: false,
                         message: '未找到符合条件的嵌套 iframe'

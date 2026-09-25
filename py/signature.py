@@ -5,7 +5,7 @@ import shutil
 import argparse
 
 try:
-    from py.resource_utils import get_resource_path
+    from py.resource_utils import get_local_tool_path, get_resource_path
 except ImportError:
     def get_resource_path(relative_path):
         try:
@@ -14,6 +14,9 @@ except ImportError:
             base_path = os.path.abspath(os.path.dirname(__file__))
         return os.path.join(base_path, relative_path)
 
+    def get_local_tool_path(tool_name, environment_variable=None, android_sdk=False):
+        raise ImportError("无法导入本地工具路径解析模块")
+
 
 def sign_apk(apk_path, keystore_path, alias, store_pass, key_pass):
     if not os.path.exists(apk_path):
@@ -21,24 +24,32 @@ def sign_apk(apk_path, keystore_path, alias, store_pass, key_pass):
     if not os.path.exists(keystore_path):
         raise FileNotFoundError(f"Keystore 不存在: {keystore_path}")
 
-    apksigner_jar = get_resource_path(os.path.join(
-        "resources",
-        "android-sdk",
-        "build-tools",
-        "lib",
-        "apksigner.jar"
-    ))
+    # 使用本机 Java、Android SDK Build-Tools 中的 apksigner/zipalign。
+    local_java = get_local_tool_path("java", "JAVA_HOME")
+    apksigner_path = get_local_tool_path(
+        "apksigner", "APKSIGNER_PATH", android_sdk=True
+    )
+    zipalign_path = get_local_tool_path(
+        "zipalign", "ZIPALIGN_PATH", android_sdk=True
+    )
 
-    bundled_java = get_resource_path(os.path.join("resources", "jre", "bin", "java.exe"))
+    if not local_java:
+        raise FileNotFoundError(
+            "未找到本地 Java。请安装 JDK，并设置 JAVA_HOME 或将 java 加入 PATH。"
+        )
+    if not apksigner_path:
+        raise FileNotFoundError(
+            "未找到 apksigner。请安装 Android SDK Build-Tools，并设置 "
+            "ANDROID_SDK_ROOT/ANDROID_HOME 或将 apksigner 加入 PATH。"
+        )
 
-    if not os.path.exists(apksigner_jar):
-        raise FileNotFoundError(f"找不到捆绑的 apksigner.jar: {apksigner_jar}")
-    if not os.path.exists(bundled_java):
-        raise FileNotFoundError(f"找不到捆绑的 java 可执行文件: {bundled_java}")
+    apksigner_command = [apksigner_path]
+    if apksigner_path.lower().endswith(".jar"):
+        apksigner_command = [local_java, "-jar", apksigner_path]
 
     # 显示apksigner版本信息
     try:
-        version_cmd = [bundled_java, "-jar", apksigner_jar, "--version"]
+        version_cmd = apksigner_command + ["--version"]
         version_result = subprocess.run(version_cmd, capture_output=True, text=True)
         print(f"apksigner版本: {version_result.stdout.strip()}")
     except Exception as e:
@@ -46,15 +57,6 @@ def sign_apk(apk_path, keystore_path, alias, store_pass, key_pass):
 
     # 在签名之前执行 zipalign
     try:
-        zipalign_candidates = [
-            get_resource_path(os.path.join("resources", "android-sdk", "build-tools", "zipalign.exe")),
-        ]
-        zipalign_path = None
-        for p in zipalign_candidates:
-            if p and os.path.exists(p):
-                zipalign_path = p
-                break
-
         if zipalign_path:
             aligned_apk = apk_path + ".aligned.apk"
             za_cmd = [zipalign_path, "-v", "4", apk_path, aligned_apk]
@@ -77,9 +79,8 @@ def sign_apk(apk_path, keystore_path, alias, store_pass, key_pass):
 
     signed_apk = apk_path + ".signed.apk"
 
-    java_exec = bundled_java
-    cmd = [
-        java_exec, "-jar", apksigner_jar, "sign",
+    cmd = apksigner_command + [
+        "sign",
         "--ks", keystore_path,
         "--ks-key-alias", alias,
         "--ks-pass", f"pass:{store_pass}",
@@ -102,8 +103,8 @@ def sign_apk(apk_path, keystore_path, alias, store_pass, key_pass):
         )
 
     # 验证签名
-    verify_cmd = [
-        java_exec, "-jar", apksigner_jar, "verify",
+    verify_cmd = apksigner_command + [
+        "verify",
         "--verbose",
         signed_apk
     ]

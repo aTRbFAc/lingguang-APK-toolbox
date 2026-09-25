@@ -61,7 +61,25 @@
    playwright install chromium
    ```
 
-4. **运行应用程序**
+4. **安装本地 APK 构建工具**
+
+   本项目不再使用仓库 `resources` 目录中捆绑的 Java、apktool 或 Android SDK
+   工具。运行 APK 打包功能前，请在本机安装并配置以下 SDK/工具：
+
+   - **JDK 8 或更高版本**：设置 `JAVA_HOME`，并将 `%JAVA_HOME%\bin` 加入
+     `PATH`，确保命令行可以执行 `java`。
+   - **Android SDK Command-line Tools**：安装 **Android SDK Build-Tools**
+     （建议使用 35.0.0 或更高版本），设置 `ANDROID_SDK_ROOT`（或
+     `ANDROID_HOME`）。需要其中的 `apksigner` 和 `zipalign`。
+   - **apktool**：下载并安装 apktool，将 `apktool.bat` 所在目录加入
+     `PATH`。也可以通过 `APKTOOL_PATH` 指定 `apktool.bat` 或 `apktool.jar`
+     的完整路径。
+
+   `apksigner` 和 `zipalign` 也可以分别通过 `APKSIGNER_PATH` 和
+   `ZIPALIGN_PATH` 指定。程序会优先使用这些环境变量，其次查找 Android SDK
+   最新的 Build-Tools，最后查找系统 `PATH`。
+
+5. **运行应用程序**
    ```bash
    python main.py
    ```

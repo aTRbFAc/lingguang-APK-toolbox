@@ -9,7 +9,7 @@ import tkinter as tk
 from tkinter import messagebox, filedialog, ttk, simpledialog
 import xml.etree.ElementTree as ET
 
-from py.resource_utils import get_resource_path
+from py.resource_utils import get_local_tool_path, get_resource_path
 
 ANDROID_NS = "http://schemas.android.com/apk/res/android"
 
@@ -54,20 +54,30 @@ class APKGenerator:
             'use_custom_keystore': False
         }
 
-        self.jre_java = get_resource_path(
-            os.path.join("resources", "jre", "bin", "java.exe")
-        )
-        self.apktool_jar = get_resource_path(
-            os.path.join("resources", "apktool.jar")
-        )
+        # 使用本机 Java 和 apktool，不再依赖 resources 中捆绑的 JRE/apktool。
+        self.local_java = get_local_tool_path("java", "JAVA_HOME")
+        self.apktool_path = get_local_tool_path("apktool", "APKTOOL_PATH")
+
+        if not self.local_java:
+            raise FileNotFoundError(
+                "未找到本地 Java。请安装 JDK，并设置 JAVA_HOME 或将 java 加入 PATH。"
+            )
+        if not self.apktool_path:
+            raise FileNotFoundError(
+                "未找到本地 apktool。请安装 apktool，并设置 APKTOOL_PATH 或将 apktool 加入 PATH。"
+            )
 
     def modify_androidmanifest_apktool(self, apk_path):
         decode_dir = None
         try:
             decode_dir = tempfile.mkdtemp(prefix="apktool_decode_")
 
+            apktool_command = [self.apktool_path]
+            if self.apktool_path.lower().endswith(".jar"):
+                apktool_command = [self.local_java, "-jar", self.apktool_path]
+
             subprocess.run(
-                [self.jre_java, "-jar", self.apktool_jar, "d", apk_path, "-o", decode_dir, "--force"],
+                apktool_command + ["d", apk_path, "-o", decode_dir, "--force"],
                 check=True, capture_output=True, text=True
             )
 
@@ -119,7 +129,7 @@ class APKGenerator:
 
             rebuilt_apk_path = apk_path.replace(".apk", "_rebuilt.apk")
             subprocess.run(
-                [self.jre_java, "-jar", self.apktool_jar, "b", decode_dir, "-o", rebuilt_apk_path],
+                apktool_command + ["b", decode_dir, "-o", rebuilt_apk_path],
                 check=True, capture_output=True, text=True
             )
 
