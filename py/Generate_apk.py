@@ -13,6 +13,41 @@ from py.resource_utils import get_local_tool_path, get_resource_path
 
 ANDROID_NS = "http://schemas.android.com/apk/res/android"
 
+JAVA_KEYWORDS = {
+    'abstract', 'assert', 'boolean', 'break', 'byte', 'case', 'catch', 'char',
+    'class', 'const', 'continue', 'default', 'do', 'double', 'else', 'enum',
+    'extends', 'final', 'finally', 'float', 'for', 'goto', 'if', 'implements',
+    'import', 'instanceof', 'int', 'interface', 'long', 'native', 'new',
+    'package', 'private', 'protected', 'public', 'return', 'short', 'static',
+    'strictfp', 'super', 'switch', 'synchronized', 'this', 'throw', 'throws',
+    'transient', 'try', 'void', 'volatile', 'while', 'true', 'false', 'null'
+}
+
+
+def validate_package_name(package_name):
+    """校验 Android 包名格式，返回 (是否合法, 错误提示)"""
+    if not package_name:
+        return False, "包名不能为空"
+
+    if len(package_name) > 255:
+        return False, "包名长度不能超过 255 个字符"
+
+    segments = package_name.split('.')
+    if len(segments) < 2:
+        return False, "至少需要两段，例如 com.example.app"
+
+    for seg in segments:
+        if not seg:
+            return False, "不能以点开头/结尾，也不能出现连续的点"
+        if seg[0].isdigit():
+            return False, f"每一段必须以字母开头（'{seg}'）"
+        if not re.match(r'^[a-zA-Z0-9_]+$', seg):
+            return False, f"每一段只能包含字母、数字和下划线（'{seg}'）"
+        if seg.lower() in JAVA_KEYWORDS:
+            return False, f"不能使用 Java 关键字作为段名（'{seg}'）"
+
+    return True, ""
+
 
 # 单窗体输入 Keystore 别名和密码
 class KeystoreDialog(simpledialog.Dialog):
@@ -568,7 +603,34 @@ class APKGenerator:
         custom_checkbox.deselect()
 
         form_frame.columnconfigure(1, weight=1)
-        
+
+        # 包名格式实时检测提示
+        pkg_hint_label = tk.Label(
+            main_container,
+            text="",
+            font=fonts['small'],
+            bg=colors['light'],
+            fg=colors['text_secondary'],
+            anchor='w',
+            justify='left'
+        )
+        pkg_hint_label.pack(fill=tk.X, pady=(5, 0))
+
+        def check_package_name(event=None):
+            name = entries['package_name'].get().strip()
+            if not name:
+                pkg_hint_label.config(text="", fg=colors['text_secondary'])
+                return
+            is_valid, msg = validate_package_name(name)
+            if is_valid:
+                pkg_hint_label.config(text="包名格式正确", fg=colors['success'])
+            else:
+                pkg_hint_label.config(text=f"包名格式不规范：{msg}", fg=colors['danger'])
+
+        entries['package_name'].bind('<KeyRelease>', check_package_name)
+        entries['package_name'].bind('<FocusOut>', check_package_name)
+        entries['package_name'].bind('<<Paste>>', check_package_name)
+
         tk.Label(
             main_container,
             text="提示：图标请使用PNG格式，尺寸为512x512像素",
@@ -597,6 +659,12 @@ class APKGenerator:
                     self.apk_info["package_name"]
                 ]):
                     messagebox.showwarning("提示", "请填写所有必填信息！")
+                    return
+
+                is_valid, pkg_msg = validate_package_name(self.apk_info["package_name"])
+                if not is_valid:
+                    check_package_name()
+                    messagebox.showwarning("提示", f"包名格式不规范：{pkg_msg}")
                     return
 
                 apk_path, keystore_path = self.generate_apk_with_info(extracted_path)

@@ -91,6 +91,11 @@ class ResourceLocalizer:
     
     def download_resource(self, url, local_filename):
         """下载资源文件"""
+        # 过滤掉名字为 base.js 的文件，不下载，仅保留路径改写
+        if os.path.basename(urllib.parse.urlparse(url).path) == 'base.js':
+            logger.info(f"跳过下载 base.js: {url}")
+            return True
+
         try:
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
